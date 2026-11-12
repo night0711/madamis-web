@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><link rel="icon" href="data:,"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#070a10">
+<title>配布ページ｜ゆきのよるのコンビニ</title><link rel="stylesheet" href="../../assets/style.css"></head>
+<body>
+<header class="topbar"><div class="wrap"><span class="brand">マダミス<b>Web</b></span><span class="case-no">配布用 · ゆきのよるのコンビニ</span></div></header>
+<main class="wrap narrow" style="padding-top:var(--s5)">
+<div class="eyebrow">FOR HINOMARU</div><h1 style="font-size:var(--t-2xl)">ひのまるさん用 配布ページ</h1>
+<div class="note"><strong>このページにネタバレはありません。</strong>ハンドアウトのURLと、DMの文面があるだけです。<br><span class="small">ひのまるさんも遊ぶので、<strong>ほかの2人のURLは絶対に開かないでね</strong>（コピーしてDMに貼るだけ）。</span></div>
+<h2 style="font-size:var(--t-xl);margin-top:var(--s5)">① 2人にDMを送る</h2>
+<div class="grid"><div class="panel" style="padding:var(--s4)"><div style="display:flex;gap:12px;align-items:center"><div style="width:64px;flex:0 0 auto" data-em="orange|store|陽"></div><div style="flex:1;min-width:0"><strong>ひのまるさん（あなた）</strong> → 丸山 陽太 役<div class="xs muted" style="word-break:break-all"></div></div></div><div class="btn-row" style="margin-top:12px"><a class="btn sm primary" href="h-Vz7jEIibYQyB.html">自分のページを開く（ハンドアウトの時間になったら）</a></div></div><div class="panel" style="padding:var(--s4)"><div style="display:flex;gap:12px;align-items:center"><div style="width:64px;flex:0 0 auto" data-em="grey|film|紬"></div><div style="flex:1;min-width:0"><strong>みやさん</strong> → 宮代 紬 役<div class="xs muted" style="word-break:break-all"><span data-url="h-OD5fnHmoROZy.html"></span></div></div></div><div class="btn-row" style="margin-top:12px"><button class="btn sm primary" type="button" data-copy="h-OD5fnHmoROZy.html" data-who="みやさん" data-name="宮代 紬">📋 DM用の文面ごとコピー</button><button class="btn sm ghost" type="button" data-copyurl="h-OD5fnHmoROZy.html">URLだけコピー</button></div></div><div class="panel" style="padding:var(--s4)"><div style="display:flex;gap:12px;align-items:center"><div style="width:64px;flex:0 0 auto" data-em="blue|pen|汐"></div><div style="flex:1;min-width:0"><strong>はまさん</strong> → 浜野 汐里 役<div class="xs muted" style="word-break:break-all"><span data-url="h-EC4VVYfwhl7j.html"></span></div></div></div><div class="btn-row" style="margin-top:12px"><button class="btn sm primary" type="button" data-copy="h-EC4VVYfwhl7j.html" data-who="はまさん" data-name="浜野 汐里">📋 DM用の文面ごとコピー</button><button class="btn sm ghost" type="button" data-copyurl="h-EC4VVYfwhl7j.html">URLだけコピー</button></div></div></div>
+<h2 style="font-size:var(--t-xl);margin-top:var(--s5)">② 当日の流れ（GMなし）</h2>
+<ol class="guide" style="list-style:none">
+<li>誰か1人（ボタン係）が<a href="play.html">共通ページ</a>を開いて、Discordで<strong>画面共有</strong>。ボタン係もふつうに遊べます。</li>
+<li>あとは「いまやること」に書いてあるとおりに進めるだけ。タイマーは「スタート」「次のフェーズへ」。カードは光ったら「めくる」。</li>
+<li>投票は「3、2、1、どうぞ！」で全員同時に名前を言う。ボタン係が投票ページに入れて開票。</li>
+<li>真相は、開票のあと「本当に全員投票した？」にOKすると開きます。1章ずつ、みんなで。</li>
+</ol>
+<div class="note b small">このページのURLは、ほかの2人には教えないでください。共通ページからはリンクしていません。</div>
+</main>
+<script src="../../assets/core.js"></script>
+<script>
+(function(){
+ var M = window.Madamis, base = new URL('.', location.href).href;
+ M.$$('[data-em]').forEach(function(el){ var p = el.dataset.em.split('|'); el.innerHTML = M.emblem(p[0], p[1], p[2]); });
+ M.$$('[data-url]').forEach(function(el){ el.textContent = base + el.dataset.url; });
+ document.addEventListener('click', async function(e){
+  var b = e.target.closest('[data-copy],[data-copyurl]'); if(!b) return;
+  var url = base + (b.dataset.copy || b.dataset.copyurl);
+  var text = b.dataset.copy ? ('【マダミス『ゆきのよるのコンビニ』】' + b.dataset.who + 'の役は「' + b.dataset.name + '」です。\nゲームが始まって「ハンドアウトを読む」の時間になったら開いてね。ほかの人には見せない・教えないでください。\n' + url) : url;
+  var ok = await M.copy(text); M.alert(ok ? 'コピーしました（' + (b.dataset.who || 'URL') + '）' : 'コピーできませんでした', true);
+ });
+})();
+</script>
+</body></html>

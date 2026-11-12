@@ -1,0 +1,66 @@
+/* 投票ページ：画面共有している人が票数を入力 → カウントダウン → 開票演出 → 確認ののち真相ページへ */
+(function(){
+'use strict';
+const M = window.Madamis, D = window.SCENARIO, $ = M.$, $$ = M.$$, esc = M.esc;
+const KEY = 'madamis:' + D.id + ':votes';
+const votes = Object.assign(Object.fromEntries(D.characters.map(c => [c.id, 0])), M.store.get(KEY, {}));
+document.title = '投票｜' + D.title;
+$('#app').innerHTML = `
+<header class="topbar"><div class="wrap"><a class="brand" href="play.html">← 共通ページ</a><span class="case-no">${esc(D.caseNo)}</span><span class="spacer"></span>
+<button class="btn sm ghost toggle" id="snd" type="button"></button></div></header>
+<main class="wrap narrow" style="padding-top:var(--s6)">
+  <div class="center"><div class="eyebrow">FINAL VOTE</div><h1 style="font-size:var(--t-2xl)">${esc(D.vote.question)}</h1></div>
+  <div class="panel file" data-tab="HOW TO VOTE" id="how">
+    <ol class="guide" style="list-style:none">${(D.vote.how || ['「3、2、1、どうぞ！」で全員が同時に、犯人だと思う人の名前を言う（またはDiscordのチャットに一斉に書く）。', '画面共有している人が、聞こえたとおりに下の票数を入れる。', '全員そろったら「開票する」で発表！']).map(x => `<li>${x}</li>`).join('')}</ol>
+  </div>
+  <div class="vote-grid" id="grid">${D.characters.map(c => `
+    <div class="vcard c-${c.color}" data-id="${c.id}" style="--c:var(--${c.color})">${M.emblem(c.color, c.motif, c.initial)}
+      <h3 style="margin:var(--s2) 0 0">${esc(c.name)}</h3><div class="count" aria-live="polite">?</div>
+      <div class="stepper" data-ctl><button class="btn icon sm" type="button" data-d="-1" aria-label="${esc(c.name)}の票を1減らす">−</button><output>${votes[c.id]}</output><button class="btn icon sm" type="button" data-d="1" aria-label="${esc(c.name)}の票を1増やす">＋</button></div>
+    </div>`).join('')}</div>
+  <div class="btn-row" style="justify-content:center;margin:var(--s5) 0" id="ctl">
+    <button class="btn warm" id="open" type="button" style="min-width:200px">🗳 開票する</button>
+    <button class="btn sm ghost" id="clear" type="button">票をリセット</button>
+  </div>
+  <div class="panel center" id="result" hidden style="padding:var(--s6) var(--s5)"></div>
+</main>
+<div class="countdown" id="cd" aria-live="assertive"></div>
+<footer class="foot"></footer>`;
+M.soundToggle($('#snd'));
+const out = id => $(`.vcard[data-id="${id}"] output`);
+$('#grid').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if(!b) return; const id = b.closest('.vcard').dataset.id; votes[id] = Math.max(0, Math.min(9, votes[id] + +b.dataset.d)); out(id).textContent = votes[id]; M.store.set(KEY, votes); M.sound.play('click'); });
+$('#clear').addEventListener('click', () => { D.characters.forEach(c => { votes[c.id] = 0; out(c.id).textContent = 0; }); M.store.set(KEY, votes); });
+const wait = ms => new Promise(r => setTimeout(r, M.reduce ? Math.min(ms, 200) : ms));
+$('#open').addEventListener('click', async () => {
+  const sum = Object.values(votes).reduce((a, b) => a + b, 0);
+  if(!sum){ M.alert('票数が入力されていません'); return; }
+  if(sum !== D.characters.length && !confirm(`入力された票は${sum}票です（参加者は${D.characters.length}人）。このまま開票しますか？`)) return;
+  $('#ctl').hidden = true; $('#how').hidden = true; $$('[data-ctl]').forEach(x => x.hidden = true);
+  $$('.count').forEach(x => x.textContent = '0');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const cd = $('#cd'); cd.classList.add('on');
+  for(const n of ['3', '2', '1']){ cd.innerHTML = `<span>${n}</span>`; M.sound.play('count'); await wait(900); }
+  cd.classList.remove('on'); M.sound.play('drum');
+  // 1票ずつカウントアップ
+  const max = Math.max(...Object.values(votes));
+  for(let k = 1; k <= max; k++){ for(const c of D.characters){ if(votes[c.id] >= k){ $(`.vcard[data-id="${c.id}"] .count`).textContent = k; M.sound.play('count'); await wait(420); } } }
+  await wait(900);
+  const top = D.characters.filter(c => votes[c.id] === max);
+  $$('.vcard').forEach(v => { const win = top.some(c => c.id === v.dataset.id); v.classList.toggle('win', win && top.length === 1); v.classList.toggle('dim', !win || top.length > 1); });
+  M.sound.play('hit');
+  const r = $('#result'); r.hidden = false;
+  const accused = top.length === 1 ? top[0] : null;
+  r.innerHTML = accused
+    ? `<div class="eyebrow">RESULT</div><h2>指名されたのは――<br><span style="color:var(--${accused.color === 'grey' ? 'grey' : accused.color})">${esc(accused.name)}</span></h2><p class="muted">さあ、真相を開きましょう。</p>`
+    : `<div class="eyebrow">RESULT</div><h2>票が割れた……</h2><p class="muted">同票のため、犯人は決まりませんでした。<br>（決選投票をするなら「やり直す」、しないならこのまま真相へ）</p><button class="btn sm ghost" type="button" id="again">やり直す</button>`;
+  r.insertAdjacentHTML('beforeend', `<div style="margin-top:var(--s5)"><button class="btn primary" id="truth" type="button">📂 真相を開く</button></div>`);
+  r.scrollIntoView({ behavior: M.reduce ? 'auto' : 'smooth', block: 'center' });
+  const again = $('#again'); if(again) again.addEventListener('click', () => location.reload());
+  $('#truth').addEventListener('click', () => {
+    if(!confirm('本当に全員が投票しましたか？\n\nこの先は事件の真相（ネタバレ）です。画面共有のまま、みんなで一緒に開きましょう。')) return;
+    try{ sessionStorage.setItem('madamis:voted:' + D.id, '1'); }catch(e){}
+    const slug = atob(D.vote.endingRef);
+    location.href = slug + '#accused=' + (accused ? accused.id : 'none');
+  });
+});
+})();
