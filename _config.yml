@@ -1,0 +1,3 @@
+# GitHub Pages は Jekyll で配信する。gm-notes はネタバレなのでサイトに出さない。
+exclude:
+  - gm-notes

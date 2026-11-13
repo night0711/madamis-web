@@ -66,7 +66,7 @@ app.innerHTML = `
     <div class="grid c3">
       <div class="note b"><strong>① 読む</strong><br><span class="small">DMで届いた「自分だけのページ」を読む。ほかの人のページは開かない。</span></div>
       <div class="note b"><strong>② 話す</strong><br><span class="small">タイマーに合わせて話し合う。手がかりカードは書いてあることが事実。</span></div>
-      <div class="note"><strong>③ 当てる</strong><br><span class="small">最後に犯人だと思う人に投票。真相はみんなで一緒に開こう。</span></div>
+      <div class="note"><strong>③ 当てる</strong><br><span class="small">最後に投票する。選択肢は投票ページに出る。真相はみんなで一緒に開こう。</span></div>
     </div>
     <h3 style="margin-top:var(--s5)">ルール</h3>
     <ol class="guide" style="list-style:none">${D.rules.map(r => `<li><strong>${esc(r[0])}</strong>　<span class="muted">${esc(r[1])}</span></li>`).join('')}</ol>

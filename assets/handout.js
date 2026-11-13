@@ -23,7 +23,7 @@ $('#app').innerHTML = `
     <h2>あなたの目標</h2><ul class="goals">${H.goals.map(g => `<li><span class="pt">${esc(g[0])}</span><span>${g[1]}</span></li>`).join('')}</ul>
     ${H.qa ? `<h2>聞かれたら（答え方の目安）</h2><dl class="qa">${H.qa.map(q => `<dt>Q. ${esc(q[0])}</dt><dd>${q[1]}</dd>`).join('')}</dl>` : ''}
     ${H.tips ? `<h2>立ち回りのヒント</h2><ul class="guide">${H.tips.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
-    <div class="note b small">このページの内容は事実です（犯人役は「何をしたか」も事実として書かれています）。HOに書かれていない細かいことは、事件の事実と矛盾しない範囲で自由に決めてOK。</div>
+    <div class="note b small">このページに書いてあることは、あなたの事実です。書いていない細かいことは、事件の事実と矛盾しない範囲で自由に決めてOK。</div>
   </article>
 </main><footer class="foot">${esc(H.scenario)} — ネタバレ禁止</footer>`;
 $('#unveil').addEventListener('click', () => $('#veil').classList.remove('closed'));

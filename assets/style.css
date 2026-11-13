@@ -197,9 +197,11 @@ dialog::backdrop{background:rgba(3,5,9,.82);backdrop-filter:blur(4px)}
 @media(min-width:900px){.notebook .sheet{left:auto;right:24px;bottom:24px;width:420px;border-radius:20px}}
 
 /* ===== 投票 ===== */
-.vote-grid{display:grid;gap:var(--s4)}
-@media(min-width:720px){.vote-grid{grid-template-columns:repeat(3,1fr)}}
-.vcard{--c:var(--grey);border:1px solid var(--line);border-radius:var(--r-l);padding:var(--s4);text-align:center;background:var(--surface);transition:all .5s var(--ease);position:relative;overflow:hidden}
+.vote-grid{display:grid;gap:var(--s4);grid-template-columns:minmax(0,1fr)}
+@media(min-width:640px){.vote-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1100px){.vote-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.vcard{--c:var(--grey);min-width:0;border:1px solid var(--line);border-radius:var(--r-l);padding:var(--s4);text-align:center;background:var(--surface);transition:all .5s var(--ease);position:relative;overflow:hidden}
+.vcard h3{font-size:clamp(1.05rem,3.2vw,1.35rem);overflow-wrap:anywhere}
 .vcard .emblem{width:84px;height:84px;margin:0 auto}
 .vcard .count{font-family:var(--f-mono);font-size:3rem;font-weight:800;color:var(--c);line-height:1.2;font-variant-numeric:tabular-nums}
 .vcard .stepper{display:flex;justify-content:center;align-items:center;gap:var(--s3)}
@@ -235,7 +237,19 @@ dialog::backdrop{background:rgba(3,5,9,.82);backdrop-filter:blur(4px)}
 .stage.on{display:block}
 .stage.shown{opacity:1;transform:none}
 .big-quote{font-family:var(--f-serif);font-size:var(--t-xl);line-height:1.9;text-align:center;margin:var(--s6) 0;color:#f2f4f8}
-.neon-msg{font-family:var(--f-mono);background:#02040a;border:1px solid var(--blue-d);border-radius:var(--r);padding:var(--s5);color:var(--blue);text-shadow:0 0 8px var(--blue-glow);letter-spacing:.08em;line-height:2;white-space:pre-line}
+.neon-msg{font-family:var(--f-mono);background:#02040a;border:1px solid var(--blue-d);border-radius:var(--r);padding:var(--s5);color:var(--blue);text-shadow:0 0 8px var(--blue-glow);letter-spacing:.04em;line-height:1.9;white-space:pre-line;overflow-wrap:anywhere;word-break:break-word}
+.stage.reveal .big-quote{font-size:clamp(1.15rem,4vw,1.45rem);line-height:1.7;margin:var(--s3) 0 var(--s4)}
+.stage.reveal .punch p{font-family:var(--f-serif);font-size:clamp(1.35rem,5vw,1.8rem);line-height:1.7;margin:0 0 .75em;letter-spacing:.03em}
+.stage.beat p,.stage.beat li{font-size:clamp(1.12rem,4.2vw,1.32rem);line-height:1.85}
+.stage.beat h2{font-size:clamp(1.35rem,4.8vw,1.8rem)}
+details.more{margin-top:var(--s3);border:1px solid var(--line2);border-radius:var(--r);padding:var(--s2) var(--s4);background:rgba(86,180,233,.06)}
+details.more summary{cursor:pointer;font-size:1.2rem;font-weight:800;line-height:1.5;letter-spacing:.04em;list-style:none}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:"▸ ";color:var(--orange)}
+details.more[open] summary::before{content:"▾ "}
+details.more .inner{font-size:1.125rem;line-height:1.9;padding:var(--s2) 0 var(--s4);overflow-wrap:anywhere}
+details.more .inner h3{font-size:1.25rem;margin-top:1.1em}
+details.more .inner li{margin:.35em 0}
 
 /* ===== ポータル ===== */
 .portal-hero{padding:var(--s8) 0 var(--s6);text-align:center}
