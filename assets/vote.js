@@ -35,7 +35,7 @@ const wait = ms => new Promise(r => setTimeout(r, M.reduce ? Math.min(ms, 200) :
 $('#open').addEventListener('click', async () => {
   const sum = Object.values(votes).reduce((a, b) => a + b, 0);
   if(!sum){ M.alert('票数が入力されていません'); return; }
-  if(sum !== D.characters.length && !confirm(`入力された票は${sum}票です（参加者は${D.characters.length}人）。このまま開票しますか？`)) return;
+  if(sum !== D.characters.length && !window.__voteAuto && !confirm(`入力された票は${sum}票です（参加者は${D.characters.length}人）。このまま開票しますか？`)) return;
   $('#ctl').hidden = true; $('#how').hidden = true; $$('[data-ctl]').forEach(x => x.hidden = true);
   $$('.count').forEach(x => x.textContent = '0');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -65,4 +65,39 @@ $('#open').addEventListener('click', async () => {
     location.href = slug + '#accused=' + (accused ? accused.id : 'none');
   });
 });
+
+const Sync = window.MadamisSync;
+const boot = Sync && (Sync.hashCode() || ((Sync.recall(D.id) || {}).code));
+if(boot && Sync.valid(boot)){
+  const seatKey = 'madamis:' + D.id + ':seat';
+  const seatNow = () => { try { return localStorage.getItem(seatKey) || ''; } catch(e){ return ''; } };
+  $('#how').insertAdjacentHTML('afterend', `<div class="panel" id="liveVote"><p class="small" id="liveStat"></p><label class="small">あなたの役 <select id="seatPick" aria-label="あなたの役"><option value="">選ぶ</option>${D.characters.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><div class="btn-row" id="liveBallot" style="margin-top:8px"></div></div>`);
+  $('#seatPick').value = seatNow();
+  $('#seatPick').addEventListener('change', () => { try { localStorage.setItem(seatKey, $('#seatPick').value); } catch(e){} });
+  $$('[data-ctl]').forEach(x => x.hidden = true);
+  let opened = false;
+  const sync = Sync.connect({
+    sid: D.id, code: boot, host: false,
+    onChange: s => {
+      const seat = seatNow();
+      $('#liveStat').textContent = (sync.status === 'live' ? '部屋につながっています。' : '接続しています…') + '投票 ' + Object.keys(s.votes || {}).length + ' / ' + D.characters.length;
+      $('#liveBallot').innerHTML = options.map(o => `<button class="btn sm ${s.votes && s.votes[seat] === o.id ? 'primary' : ''}" type="button" data-choice="${esc(o.id)}">${esc(o.name)}</button>`).join('');
+      if(s.voteOpen && !opened && Object.keys(s.votes || {}).length){
+        opened = true;
+        options.forEach(c => { votes[c.id] = 0; });
+        Object.keys(s.votes || {}).forEach(k => { if(votes[s.votes[k]] != null) votes[s.votes[k]]++; });
+        options.forEach(c => { const o = out(c.id); if(o) o.textContent = votes[c.id]; });
+        window.__voteAuto = true;
+        $('#open').click();
+      }
+    },
+    onStatus: () => {}
+  });
+  $('#liveBallot').addEventListener('click', e => {
+    const b = e.target.closest('[data-choice]'); if(!b) return;
+    const seat = seatNow();
+    if(!seat){ M.alert('先に自分の役を選んでください'); return; }
+    sync.castVote(seat, b.getAttribute('data-choice'));
+  });
+}
 })();

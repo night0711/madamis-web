@@ -28,4 +28,52 @@ $('#app').innerHTML = `
 </main><footer class="foot">${esc(H.scenario)} — ネタバレ禁止</footer>`;
 $('#unveil').addEventListener('click', () => $('#veil').classList.remove('closed'));
 M.notebook('madamis:' + H.sid + ':memo:' + H.id, H.name + 'のメモ');
+
+const Sync = window.MadamisSync, D = window.SCENARIO;
+if(Sync && D && D.id === H.sid){
+  const bar = document.createElement('section');
+  bar.className = 'panel room-bar';
+  bar.innerHTML = `<div class="eyebrow">ROOM</div><p class="small">ホストの部屋に入ると、この端末にも進行・タイマー・公開カード・投票が届きます。このページの秘密は送りません。</p><div class="room-line" id="hoJoin"><input id="hoCode" inputmode="latin" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="部屋コード" aria-label="部屋コード"><button class="btn primary" type="button" id="hoGo">参加する</button></div><p class="small" id="hoStat" aria-live="polite"></p><div id="hoLive" hidden><p class="serif" id="hoPhase" style="font-size:1.35rem"></p><p class="room-time" id="hoTime">--:--</p><div id="hoCards"></div><div id="hoBallot" class="btn-row" style="margin-top:8px"></div><p class="small" id="hoVote"></p></div>`;
+  $('#app').querySelector('main').insertBefore(bar, $('#app').querySelector('.summary'));
+  const options = D.characters.map(c => ({ id: c.id, name: c.name })).concat((D.vote.extra || []).map(c => ({ id: c.id, name: c.name })));
+  let sess = null;
+  function paint(){
+    if(!sess){ $('#hoStat').textContent = ''; return; }
+    $('#hoJoin').hidden = true;
+    $('#hoLive').hidden = false;
+    $('#hoStat').textContent = sess.status === 'live' ? ('部屋 ' + sess.code + ' につながっています') : '接続しています…';
+    const p = D.phases[sess.state.phase] || D.phases[0];
+    $('#hoPhase').textContent = (sess.state.phase + 1) + '. ' + (p ? p.name : '');
+    const left = Sync.leftMs(sess.state);
+    $('#hoTime').textContent = left == null ? '--:--' : M.fmt(Math.max(0, left / 1000));
+    const open = sess.state.revealed || [];
+    $('#hoCards').innerHTML = open.map(id => {
+      const c = D.clues.find(x => x.id === id); if(!c) return '';
+      return `<details class="more"><summary>${esc(c.no)} ${esc(c.title)}</summary><div class="inner">${c.body}</div></details>`;
+    }).join('') || '<p class="small muted">まだ開いたカードはありません。</p>';
+    const mine = (sess.state.votes || {})[H.id];
+    if(sess.state.voteOpen){
+      const counts = Sync.tally(sess.state, options.map(o => o.id));
+      $('#hoBallot').innerHTML = '';
+      $('#hoVote').textContent = options.map(o => o.name + ' ' + counts[o.id]).join('　');
+    } else {
+      $('#hoBallot').innerHTML = options.map(o => `<button class="btn sm ${mine === o.id ? 'primary' : ''}" type="button" data-choice="${esc(o.id)}">${esc(o.name)}</button>`).join('');
+      $('#hoVote').textContent = mine ? '送りました。開票まで、ほかの票は出ません。' : 'あなたの票を選べます。';
+    }
+  }
+  function join(code){
+    if(!Sync.valid(Sync.normalize(code))){ M.alert('コードは8文字です'); return; }
+    if(sess) sess.close();
+    sess = Sync.connect({ sid: H.sid, code: code, host: false, seat: H.id, onChange: paint, onStatus: paint });
+    paint();
+  }
+  $('#hoGo').addEventListener('click', () => join($('#hoCode').value));
+  $('#hoBallot').addEventListener('click', e => {
+    const b = e.target.closest('[data-choice]'); if(!b || !sess) return;
+    sess.castVote(H.id, b.getAttribute('data-choice'));
+  });
+  setInterval(() => { if(sess && sess.state.timer && sess.state.timer.running){ const left = Sync.leftMs(sess.state); $('#hoTime').textContent = left == null ? '--:--' : M.fmt(Math.max(0, left / 1000)); } }, 500);
+  const boot = Sync.hashCode() || ((Sync.recall(H.sid) || {}).code || '');
+  if(boot && Sync.valid(boot)) join(boot);
+}
 })();
