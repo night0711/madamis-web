@@ -178,7 +178,7 @@ body.has-dock{padding-bottom:84px}
 .log li{padding:4px 0;border-bottom:1px dashed var(--line)}
 
 /* 拡大表示 */
-dialog{border:none;padding:0;background:transparent;max-width:min(680px,94vw);width:100%;color:inherit}
+dialog{border:none;padding:0;background:transparent;max-width:min(680px,94vw);width:100%;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;color:inherit}
 dialog::backdrop{background:rgba(3,5,9,.82);backdrop-filter:blur(4px)}
 .modal{background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-l);padding:var(--s5);box-shadow:var(--shadow)}
 .modal.paper{background:var(--paper);color:var(--paper-ink)}
@@ -268,7 +268,7 @@ footer.foot{padding:var(--s7) 0 var(--s6);text-align:center;color:var(--faint);f
 @media (prefers-reduced-motion: reduce){.cutin.on .band{animation:none;transform:none}}
 /* ===== 調整 ===== */
 [hidden]{display:none!important}
-section[id]{scroll-margin-top:72px}
+section[id],.stage{scroll-margin-top:calc(72px + env(safe-area-inset-top))}
 .nowrap-word{display:inline-block}
 .notebook .sheet{visibility:hidden;transition:transform .45s var(--ease),visibility 0s .45s}
 .notebook.open .sheet{visibility:visible;transition:transform .45s var(--ease),visibility 0s}
@@ -306,11 +306,31 @@ section[id]{scroll-margin-top:72px}
   dialog::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
   .char .emblem{filter:none}
   .card{perspective:none}
+  .card,.card .inner{min-height:0;height:auto}
   .card .inner{transform:none!important;transform-style:flat;transition:none}
-  .card .face,.card .back{transform:none;-webkit-backface-visibility:visible;backface-visibility:visible}
-  .card:not(.open) .face{visibility:hidden}
-  .card.open .back{visibility:hidden}
+  .card .face,.card .back{position:relative;inset:auto;overflow:visible;transform:none;-webkit-backface-visibility:visible;backface-visibility:visible}
+  .card .back{min-height:300px}
+  .card:not(.open) .face{display:none}
+  .card.open .back{display:none}
+  .card .face .body{overflow:visible;flex:none}
+  .card .zoom{position:static;align-self:flex-end;margin-top:8px;min-height:44px;min-width:44px;padding:8px 14px;font-size:13px}
   .card.ready .back{animation:none}
+  .topbar{padding-top:env(safe-area-inset-top)}
+  .topbar .brand{display:inline-flex;align-items:center;min-height:44px}
+  .topbar .btn.toggle{width:44px;min-height:44px}
+  .btn.sm,.btn.icon.sm{min-height:44px}
+  .btn.icon.sm{width:44px}
+  .chip{min-height:44px;min-width:44px;padding:8px 14px}
+  .steps li{min-height:44px;display:inline-flex;align-items:center}
+  summary{min-height:44px;padding-top:10px;padding-bottom:10px}
+  .dock a{font-size:12px;min-height:48px;justify-content:center}
+  .alert{top:calc(64px + env(safe-area-inset-top));max-width:calc(100vw - 32px);white-space:normal;text-align:center}
+  .notebook .fab{width:44px;height:44px}
+  .notebook .sheet{padding-bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
   .veil.closed>.veil-body{filter:none}
   .veil.closed>.veil-body,.veil.closed>.veil-body *{color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:0 0 8px rgba(210,216,226,.95)}
+}
+@media (max-width:1099px){
+  body.has-dock{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  .notebook{bottom:calc(96px + env(safe-area-inset-bottom))}
 }
