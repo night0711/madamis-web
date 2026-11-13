@@ -6,6 +6,10 @@ if(!D){ document.body.innerHTML = '<p style="padding:2em">scenario.js が読み�
 const KEY = 'madamis:' + D.id + ':state';
 const st = Object.assign({ phase: 0, remain: null, endAt: null, running: false, revealed: [], log: [] }, M.store.get(KEY, {}));
 const save = () => M.store.set(KEY, st);
+let sync = null;
+const SEATK = 'madamis:' + D.id + ':seat';
+function mySeat(){ try { return localStorage.getItem(SEATK) || ''; } catch(e){ return ''; } }
+function setSeat(v){ try { localStorage.setItem(SEATK, v); } catch(e){} }
 const phaseOf = id => D.phases.findIndex(p => (p.unlock || []).includes(id));
 const charMap = Object.fromEntries(D.characters.map(c => [c.id, c]));
 document.title = D.title + '｜マダミス Web';
@@ -30,6 +34,20 @@ app.innerHTML = `
   <button class="btn sm ghost toggle" id="snd" type="button"></button>
 </div></header>
 <main>
+<section class="wrap" id="roomBar">
+  <div class="panel room-bar">
+    <div class="eyebrow">ROOM</div>
+    <p class="small" id="roomBlurb">各端末で同じ進行を見るときは、ホストの部屋コードを入れてください。入れなければ、この端末だけの進行（画面共有）のままです。</p>
+    <div class="room-line" id="roomJoinRow">
+      <input id="roomInput" inputmode="latin" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="部屋コード" aria-label="部屋コード">
+      <button class="btn primary" type="button" id="roomJoin">参加する</button>
+      <button class="btn ghost" type="button" id="roomExit" hidden>部屋を出る</button>
+    </div>
+    <p class="small" id="roomStatus" aria-live="polite"></p>
+    <div id="roomSeat"></div>
+    <div id="roomBallot"></div>
+  </div>
+</section>
 <section class="hero wrap" id="top">
   <div class="kv">${kvImg}</div>
   <div style="padding:var(--s5) 0 0">
@@ -73,7 +91,7 @@ app.innerHTML = `
     <details style="margin-top:var(--s4)"><summary style="cursor:pointer;color:var(--orange-l)">用語ミニ辞典</summary>
       <dl class="small">${D.glossary.map(g => `<dt style="font-weight:700;margin-top:8px">${esc(g[0])}</dt><dd style="margin:0;color:var(--muted)">${esc(g[1])}</dd>`).join('')}</dl></details>
     <details style="margin-top:var(--s3)"><summary style="cursor:pointer;color:var(--orange-l)">このページの使い方（GMなし・全員プレイヤー）</summary>
-      <p class="small muted" style="margin-top:8px">GMはいません。<strong>誰か1人がこのページをDiscordで画面共有</strong>して、ボタン係をするだけ（ボタン係も普通に遊べます）。このページには秘密は一切ないので、誰が操作しても大丈夫。進め方は「いまやること」に毎回出ます。自分のスマホでも見たい人は、カードを開いたあと「共有リンクをコピー」してDiscordに貼れば、同じ状態を各自で開けます。状態はこのブラウザに保存されるので、再読み込みしても消えません。</p></details>
+      <p class="small muted" style="margin-top:8px">GMはいません。ホストが部屋を作ったときは、このページを各自のスマホで開くと、フェーズ・タイマー・カード・投票が揃います。部屋を使わないときは、今まで通り<strong>誰か1人が画面共有</strong>してボタン係をします。このページに秘密はありません。状態はこのブラウザにも残るので、再読み込みしても部屋に戻れます。</p></details>
   </div>
 </section>
 
@@ -177,25 +195,27 @@ function tick(){
     const sec = Math.ceil(rr);
     if(rr <= 60 && rr > 0 && !warned && tot > 60){ warned = true; M.alert('⏳ あと1分！'); M.sound.play('warn'); }
     if(sec <= 10 && sec > 0 && sec !== lastTick){ lastTick = sec; M.sound.play('tick'); }
-    if(rr <= 0 && !ended){ ended = true; st.running = false; st.remain = 0; st.endAt = null; save(); M.alert('🔔 時間です！', true); M.sound.play('end'); tick(); }
+    if(rr <= 0 && !ended){ ended = true; if(!sync){ st.running = false; st.remain = 0; st.endAt = null; save(); } M.alert('🔔 時間です！', true); M.sound.play('end'); tick(); }
   }
 }
 setInterval(() => { if(st.running) tick(); }, 250);
 $('#startBtn').addEventListener('click', () => {
+  if(sync) return;
   const r = remain(); if(r == null) return;
   if(st.running){ st.remain = Math.max(0, r); st.endAt = null; st.running = false; }
   else { if(r <= 0) st.remain = total(); st.endAt = Date.now() + (st.remain == null ? total() : st.remain) * 1000; st.running = true; ended = false; if((st.remain == null ? total() : st.remain) > 60) warned = false; }
   save(); M.sound.play('click'); tick();
 });
 function goPhase(i){
+  if(sync) return;
   if(i < 0 || i >= D.phases.length) return; st.phase = i; st.remain = null; st.endAt = null; st.running = false; save();
   cutin(); renderPhase(true); M.sound.play('phase');
 }
 $('#next').addEventListener('click', () => goPhase(st.phase + 1));
 $('#prev').addEventListener('click', () => { if(confirm('ひとつ前のフェーズに戻りますか？')) goPhase(st.phase - 1); });
-$('#reset').addEventListener('click', () => { st.remain = null; st.endAt = null; st.running = false; save(); warned = ended = false; tick(); });
-$('#plus').addEventListener('click', () => { const r = remain(); if(r == null) return; if(st.running) st.endAt += 60000; else st.remain = Math.max(0, r) + 60; warned = false; ended = false; save(); tick(); M.alert('＋1分 延長しました', true); });
-$('#steps').addEventListener('click', e => { const li = e.target.closest('li'); if(!li) return; const i = +li.dataset.i; if(i !== st.phase && confirm('「' + D.phases[i].name + '」へ移動しますか？')) goPhase(i); });
+$('#reset').addEventListener('click', () => { if(sync) return; st.remain = null; st.endAt = null; st.running = false; save(); warned = ended = false; tick(); });
+$('#plus').addEventListener('click', () => { if(sync) return; const r = remain(); if(r == null) return; if(st.running) st.endAt += 60000; else st.remain = Math.max(0, r) + 60; warned = false; ended = false; save(); tick(); M.alert('＋1分 延長しました', true); });
+$('#steps').addEventListener('click', e => { if(sync) return; const li = e.target.closest('li'); if(!li) return; const i = +li.dataset.i; if(i !== st.phase && confirm('「' + D.phases[i].name + '」へ移動しますか？')) goPhase(i); });
 function cutin(){
   const p = D.phases[st.phase], c = $('#cutin'); $('#cutNo').textContent = 'PHASE ' + String(st.phase + 1).padStart(2, '0'); $('#cutName').textContent = p.name;
   c.classList.remove('on'); void c.offsetWidth; c.classList.add('on'); setTimeout(() => c.classList.remove('on'), 2200);
@@ -220,7 +240,7 @@ function renderCards(){
 }
 $('#cards').addEventListener('click', e => {
   const f = e.target.closest('[data-flip]'), z = e.target.closest('[data-zoom]'), card = e.target.closest('.card');
-  if(f){ const id = f.dataset.flip; if(!st.revealed.includes(id)){ st.revealed.push(id); st.log.push([Date.now(), id]); save(); }
+  if(f){ if(sync) return; const id = f.dataset.flip; if(!st.revealed.includes(id)){ st.revealed.push(id); st.log.push([Date.now(), id]); save(); }
     M.sound.play('flip'); const c = D.clues.find(x => x.id === id); const el = card; $('.body', el).innerHTML = c.body; $('.face', el).removeAttribute('aria-hidden'); el.classList.remove('ready'); requestAnimationFrame(() => el.classList.add('open'));
     $('.zoom', el).removeAttribute('tabindex'); setTimeout(renderCards, 950); return; }
   if(z || (card && card.classList.contains('open'))){ const c = D.clues.find(x => x.id === (z ? z.dataset.zoom : card.dataset.id)); openZoom(`<div class="xs" style="letter-spacing:.2em;color:#7a6a4e">EVIDENCE ${esc(c.no)}・${esc(c.tag)}</div><h3 class="serif">${esc(c.title)}</h3><div style="line-height:2">${c.body}</div>`, true); }
@@ -228,11 +248,14 @@ $('#cards').addEventListener('click', e => {
 function openZoom(html, paper){ const d = $('#zoom'), b = $('#zoomBody'); b.className = 'modal' + (paper ? ' paper' : ''); b.innerHTML = html + '<div style="text-align:right;margin-top:16px"><button class="btn sm" type="button" data-close style="color:inherit">閉じる</button></div>'; d.showModal ? d.showModal() : d.setAttribute('open', ''); }
 $('#zoom').addEventListener('click', e => { if(e.target.id === 'zoom' || e.target.closest('[data-close]')) $('#zoom').close(); });
 $('#mapZoom').addEventListener('click', () => openZoom('<h3>' + esc(D.mapTitle || '見取り図') + '</h3>' + D.map, false));
-$('#share').addEventListener('click', async () => { const ok = await M.copy(shareURL()); M.alert(ok ? '🔗 共有リンクをコピーしました' : 'コピーできませんでした', true); });
-$('#wipe').addEventListener('click', () => { if(confirm('フェーズ・公開カード・タイマーを最初の状態に戻します。よろしいですか？（メモは消えません）')){ M.store.del(KEY); location.href = location.pathname; } });
+$('#share').addEventListener('click', async () => {
+  const url = sync ? (location.href.split('#')[0] + '#r=' + sync.code) : shareURL();
+  const ok = await M.copy(url); M.alert(ok ? '🔗 共有リンクをコピーしました' : 'コピーできませんでした', true);
+});
+$('#wipe').addEventListener('click', () => { if(sync) return; if(confirm('フェーズ・公開カード・タイマーを最初の状態に戻します。よろしいですか？（メモは消えません）')){ M.store.del(KEY); location.href = location.pathname; } });
 
 /* 別タブ・別端末と同じブラウザ内での同期（同じ端末で複数タブを開いた場合） */
-window.addEventListener('storage', e => { if(e.key === KEY){ Object.assign(st, JSON.parse(e.newValue || '{}')); renderPhase(false); } });
+window.addEventListener('storage', e => { if(sync) return; if(e.key === KEY){ Object.assign(st, JSON.parse(e.newValue || '{}')); renderPhase(false); } });
 
 /* ---------- 下部メニューの現在地 ---------- */
 const secs = ['story', 'chars', 'timer', 'clues', 'vote'].map(id => document.getElementById(id));
@@ -241,4 +264,95 @@ if('IntersectionObserver' in window){ const io = new IntersectionObserver(es => 
 const loaded = readHash();
 renderPhase(false);
 if(loaded){ M.alert('共有された進行状態を読み込みました', true); setTimeout(() => $('#clues').scrollIntoView(), 50); }
+
+/* ---------- 部屋（閲覧と投票。進行の操作はホストの配布ページ） ---------- */
+const Sync = window.MadamisSync;
+const voteOptions = D.characters.map(c => ({ id: c.id, name: c.name })).concat((D.vote.extra || []).map(c => ({ id: c.id, name: c.name })));
+function applyRemote(s){
+  const phaseChanged = s.phase !== st.phase;
+  const prev = st.revealed.join(',');
+  st.phase = s.phase;
+  st.revealed = (s.revealed || []).filter(id => D.clues.some(c => c.id === id));
+  st.log = (s.log || []).map(x => [x[0], x[1]]);
+  if(s.timer && s.timer.running && typeof s.timer.endAt === 'number'){
+    st.running = true;
+    st.endAt = s.timer.endAt - (s._skew || 0);
+    st.remain = null;
+  } else {
+    st.running = false;
+    st.endAt = null;
+    st.remain = s.timer && typeof s.timer.remain === 'number' ? s.timer.remain : null;
+  }
+  const structural = phaseChanged || st.revealed.join(',') !== prev;
+  if(phaseChanged){ warned = false; ended = false; }
+  save();
+  if(structural) renderPhase(phaseChanged);
+  else tick();
+  if(st.revealed.join(',') !== prev && prev) M.sound.play('flip');
+}
+function paintRoom(){
+  const bar = $('#roomStatus'), exit = $('#roomExit'), row = $('#roomJoinRow');
+  if(!sync){ bar.textContent = ''; exit.hidden = true; row.hidden = false; $('#roomSeat').hidden = true; $('#roomBallot').innerHTML = ''; document.body.classList.remove('sync-guest'); return; }
+  document.body.classList.add('sync-guest');
+  row.hidden = true; exit.hidden = false;
+  $('#roomSeat').hidden = false;
+  bar.textContent = sync.status === 'live' ? ('部屋 ' + sync.code + ' につながっています。進行はホストの端末です。') : ('部屋 ' + sync.code + ' に接続しています…');
+  const seat = mySeat();
+  if(!$('#seatPick')){
+    $('#roomSeat').innerHTML = '<label class="small">あなたの役 <select id="seatPick" aria-label="あなたの役">' +
+      '<option value="">選んでください</option>' +
+      D.characters.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('') +
+      '</select></label>';
+    $('#seatPick').addEventListener('change', () => setSeat($('#seatPick').value));
+  }
+  if($('#seatPick').value !== seat) $('#seatPick').value = seat;
+  const votes = (sync.state && sync.state.votes) || {};
+  const n = Object.keys(votes).length;
+  let html = '<p class="small">投票 ' + n + ' / ' + D.characters.length + '</p>';
+  if(sync.state && sync.state.voteOpen){
+    const counts = Sync.tally(sync.state, voteOptions.map(o => o.id));
+    html += '<ul class="guide">' + voteOptions.map(o => `<li>${esc(o.name)}　${counts[o.id]}</li>`).join('') + '</ul>';
+    html += '<p><a class="btn primary" id="roomTruth" href="' + esc(atob(D.vote.endingRef) + '#accused=' + Sync.winner(sync.state, voteOptions.map(o => o.id))) + '">真相を開く</a></p>';
+  } else {
+    html += '<div class="btn-row">' + voteOptions.map(o => `<button class="btn sm ${votes[seat] === o.id ? 'primary' : ''}" type="button" data-choice="${esc(o.id)}">${esc(o.name)}</button>`).join('') + '</div>';
+    if(votes[seat]) html += '<p class="small muted">送りました。開票まで、ほかの人の票は出ません。</p>';
+  }
+  $('#roomBallot').innerHTML = html;
+  const truth = $('#roomTruth');
+  if(truth) truth.addEventListener('click', () => { try { sessionStorage.setItem('madamis:voted:' + D.id, '1'); } catch(e){} });
+}
+$('#roomBallot').addEventListener('click', e => {
+  const b = e.target.closest('[data-choice]'); if(!b || !sync) return;
+  const seat = mySeat();
+  if(!seat){ M.alert('先に自分の役を選んでください'); return; }
+  sync.castVote(seat, b.getAttribute('data-choice'));
+  M.sound.play('click');
+});
+function joinRoom(code){
+  if(!Sync || !Sync.valid(Sync.normalize(code))){ M.alert('コードは8文字です'); return; }
+  if(sync) sync.close();
+  sync = Sync.connect({
+    sid: D.id, code: code, host: false,
+    onChange: s => { applyRemote(s); paintRoom(); },
+    onTick: s => {
+      if(s.timer && s.timer.running && typeof s.timer.endAt === 'number'){
+        st.running = true;
+        st.endAt = s.timer.endAt - (s._skew || 0);
+      }
+    },
+    onStatus: paintRoom
+  });
+  const base = location.pathname + location.search;
+  history.replaceState(null, '', base + '#r=' + Sync.normalize(code));
+  paintRoom();
+}
+$('#roomJoin').addEventListener('click', () => joinRoom($('#roomInput').value));
+$('#roomInput').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); joinRoom($('#roomInput').value); } });
+$('#roomExit').addEventListener('click', () => {
+  Sync.leave(D.id); if(sync) sync.close(); sync = null;
+  history.replaceState(null, '', location.pathname);
+  paintRoom(); renderPhase(false);
+});
+const bootCode = (Sync && (Sync.hashCode() || ((Sync.recall(D.id) || {}).code))) || '';
+if(bootCode && Sync.valid(bootCode) && !loaded) joinRoom(bootCode);
 })();
