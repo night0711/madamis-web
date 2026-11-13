@@ -14,7 +14,14 @@ $('#app').innerHTML = `
   <div class="center" style="margin-top:var(--s5)"><button class="btn primary" id="nextStage" type="button" hidden>▼ 続きを開く</button></div>
 </main>`;
 M.soundToggle($('#snd'));
-const stages = () => [E.branches[accused] || E.branches.none, ...E.stages];
+const stages = () => {
+  const b = E.branches[accused] || E.branches.none;
+  const head = Object.assign({}, b, {
+    html: (b.html || '') + (E.punch || ''),
+    cls: ((b.cls || '') + ' reveal').trim()
+  });
+  return [head, ...E.stages];
+};
 let shown = 0;
 function build(){
   $('#stages').innerHTML = stages().map((s, i) => `<section class="stage panel ${s.cls || ''}" data-i="${i}"><div class="eyebrow">${esc(s.eyebrow || 'CHAPTER ' + (i + 1))}</div><h2>${esc(s.h)}</h2>${s.html}</section>`).join('');
