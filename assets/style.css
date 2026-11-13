@@ -23,7 +23,7 @@ body{margin:0;min-height:100vh;color:var(--text);font-family:var(--f-sans);font-
    radial-gradient(1200px 700px at 15% -10%,rgba(0,114,178,.22),transparent 60%),
    radial-gradient(900px 600px at 110% 10%,rgba(230,159,0,.10),transparent 55%),
    linear-gradient(180deg,var(--bg2),var(--bg) 60%);
-  background-attachment:fixed;overflow-x:hidden}
+  background-attachment:fixed;overflow-x:hidden;overflow-x:clip}
 /* 粒子感と周辺減光（CSSのみ） */
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.07;mix-blend-mode:overlay;
   background-image:repeating-radial-gradient(circle at 17% 32%,#fff 0 .6px,transparent .7px 3px),repeating-radial-gradient(circle at 71% 64%,#fff 0 .5px,transparent .6px 2.6px)}
@@ -132,7 +132,7 @@ body.has-dock{padding-bottom:84px}
 .ring .ph{font-size:var(--t-xs);letter-spacing:.25em;color:var(--muted)}
 .ring.warn .time{color:var(--orange-l);animation:pulse 1s infinite}
 .ring.done .time{color:var(--orange-l)}
-@keyframes pulse{50%{transform:scale(1.06);text-shadow:0 0 24px var(--orange-glow)}}
+@keyframes pulse{50%{transform:scale(1.06)}}
 .phase-now h3{font-size:var(--t-xl)}
 .guide{list-style:none;padding:0;margin:var(--s3) 0}
 .guide li{position:relative;padding-left:1.6em;margin:6px 0}
@@ -290,3 +290,27 @@ section[id]{scroll-margin-top:72px}
 .doc dl.qa{margin:0;display:grid;gap:var(--s3)}
 .doc dl.qa dt{font-weight:700;color:var(--c,var(--orange-l));line-height:1.6}
 .doc dl.qa dd{margin:0;padding:var(--s2) var(--s3);border-left:3px solid var(--c,var(--line2));background:rgba(255,255,255,.03);border-radius:0 var(--r) var(--r) 0;line-height:1.8}
+
+/* 携帯のスクロールがガクガクするのを止める。
+   画面いっぱいの fixed 背景・ブレンド・ぼかしは、スクロールのたびに画面全体を描き直す。
+   狭い画面とタッチ端末では、同じ夜の雰囲気を1枚の静止レイヤーにまとめる。 */
+@media (max-width: 1100px), (pointer: coarse){
+  body{background:#070a10;background-attachment:scroll}
+  body::before{display:none}
+  body::after{background:
+    radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.65) 100%),
+    radial-gradient(1200px 700px at 15% -10%,rgba(0,114,178,.22),transparent 60%),
+    radial-gradient(900px 600px at 110% 10%,rgba(230,159,0,.10),transparent 55%),
+    linear-gradient(180deg,var(--bg2),var(--bg) 60%)}
+  .topbar,.dock{-webkit-backdrop-filter:none;backdrop-filter:none;background:#0c111b}
+  dialog::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
+  .char .emblem{filter:none}
+  .card{perspective:none}
+  .card .inner{transform:none!important;transform-style:flat;transition:none}
+  .card .face,.card .back{transform:none;-webkit-backface-visibility:visible;backface-visibility:visible}
+  .card:not(.open) .face{visibility:hidden}
+  .card.open .back{visibility:hidden}
+  .card.ready .back{animation:none}
+  .veil.closed>.veil-body{filter:none}
+  .veil.closed>.veil-body,.veil.closed>.veil-body *{color:transparent!important;-webkit-text-fill-color:transparent;text-shadow:0 0 8px rgba(210,216,226,.95)}
+}
