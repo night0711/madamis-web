@@ -4,8 +4,14 @@
 const M = window.Madamis, D = window.SCENARIO, $ = M.$, $$ = M.$$, esc = M.esc;
 if(!D){ document.body.innerHTML = '<p style="padding:2em">scenario.js が読み込めませんでした。</p>'; return; }
 const KEY = 'madamis:' + D.id + ':state';
-const st = Object.assign({ phase: 0, remain: null, endAt: null, running: false, revealed: [], log: [] }, M.store.get(KEY, {}));
+const st = Object.assign({ phase: 0, remain: null, endAt: null, running: false, revealed: [], log: [], marks: [] }, M.store.get(KEY, {}));
+if(!Array.isArray(st.marks)) st.marks = [];
 const save = () => M.store.set(KEY, st);
+function markPhase(i){
+  if(sync) return;
+  const last = st.marks[st.marks.length - 1];
+  if(!last || last[1] !== i) st.marks.push([Date.now(), i]);
+}
 let sync = null;
 const SEATK = 'madamis:' + D.id + ':seat';
 function mySeat(){ try { return localStorage.getItem(SEATK) || ''; } catch(e){ return ''; } }
@@ -18,9 +24,9 @@ document.title = D.title + '｜マダミス Web';
 function readHash(){
   const m = location.hash.match(/s=(\d+)\.?([\w-]*)/); if(!m) return false;
   const p = Math.min(+m[1], D.phases.length - 1), ids = (m[2] || '').split('-').filter(id => D.clues.some(c => c.id === id));
-  if(p !== st.phase){ st.phase = p; st.remain = null; st.endAt = null; st.running = false; }
+  if(p !== st.phase){ st.phase = p; st.remain = null; st.endAt = null; st.running = false; markPhase(p); }
   ids.forEach(id => { if(!st.revealed.includes(id)){ st.revealed.push(id); st.log.push([Date.now(), id]); } });
-  save(); history.replaceState(null, '', location.pathname + '#clues'); return true;
+  save(); history.replaceState(null, '', location.pathname + location.search + '#clues'); return true;
 }
 const shareURL = () => location.href.split('#')[0] + '#s=' + st.phase + '.' + st.revealed.join('-');
 
@@ -46,6 +52,7 @@ app.innerHTML = `
     <p class="small" id="roomStatus" aria-live="polite"></p>
     <div id="roomSeat"></div>
     <div id="roomBallot"></div>
+    <div id="finaleBox"></div>
   </div>
 </section>
 <section class="hero wrap" id="top">
@@ -134,6 +141,8 @@ app.innerHTML = `
     <div class="eyebrow">VOTE</div><h2>${esc(D.vote.question)}</h2>
     <p class="muted">${esc(D.vote.lead || '最終議論が終わったら「3、2、1」で一斉に投票。画面共有している人が投票ページに入力します。')}</p>
     <a class="btn warm" href="vote.html">🗳 投票ページへ</a>
+    <p class="small muted" id="finaleNote">最後のひとこと推理は、部屋で最終議論・投票のときに使えます。画面共有のときは、声のままで大丈夫です。</p>
+    <div id="recapBox" hidden></div>
   </div>
 </section>
 </main>
@@ -208,7 +217,7 @@ $('#startBtn').addEventListener('click', () => {
 });
 function goPhase(i){
   if(sync) return;
-  if(i < 0 || i >= D.phases.length) return; st.phase = i; st.remain = null; st.endAt = null; st.running = false; save();
+  if(i < 0 || i >= D.phases.length) return; st.phase = i; st.remain = null; st.endAt = null; st.running = false; markPhase(i); save();
   cutin(); renderPhase(true); M.sound.play('phase');
 }
 $('#next').addEventListener('click', () => goPhase(st.phase + 1));
@@ -252,16 +261,18 @@ $('#share').addEventListener('click', async () => {
   const url = sync ? (location.href.split('#')[0] + '#r=' + sync.code) : shareURL();
   const ok = await M.copy(url); M.alert(ok ? '🔗 共有リンクをコピーしました' : 'コピーできませんでした', true);
 });
-$('#wipe').addEventListener('click', () => { if(sync) return; if(confirm('フェーズ・公開カード・タイマーを最初の状態に戻します。よろしいですか？（メモは消えません）')){ M.store.del(KEY); location.href = location.pathname; } });
+$('#wipe').addEventListener('click', () => { if(sync) return; if(confirm('フェーズ・公開カード・タイマーを最初の状態に戻します。よろしいですか？（メモは消えません）')){ M.store.del(KEY); M.store.del('madamis:' + D.id + ':recap'); location.href = location.pathname; } });
 
 /* 別タブ・別端末と同じブラウザ内での同期（同じ端末で複数タブを開いた場合） */
-window.addEventListener('storage', e => { if(sync) return; if(e.key === KEY){ Object.assign(st, JSON.parse(e.newValue || '{}')); renderPhase(false); } });
+window.addEventListener('storage', e => { if(sync) return; if(e.key === KEY){ Object.assign(st, JSON.parse(e.newValue || '{}')); if(!Array.isArray(st.marks)) st.marks = []; renderPhase(false); paintRecap(); } });
 
 /* ---------- 下部メニューの現在地 ---------- */
 const secs = ['story', 'chars', 'timer', 'clues', 'vote'].map(id => document.getElementById(id));
 if('IntersectionObserver' in window){ const io = new IntersectionObserver(es => es.forEach(en => { if(en.isIntersecting) $$('.dock a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id)); }), { rootMargin: '-45% 0px -50% 0px' }); secs.forEach(s => s && io.observe(s)); }
 
 const loaded = readHash();
+if(!st.marks.length) markPhase(st.phase);
+save();
 renderPhase(false);
 if(loaded){ M.alert('共有された進行状態を読み込みました', true); setTimeout(() => $('#clues').scrollIntoView(), 50); }
 
@@ -274,6 +285,11 @@ function applyRemote(s){
   st.phase = s.phase;
   st.revealed = (s.revealed || []).filter(id => D.clues.some(c => c.id === id));
   st.log = (s.log || []).map(x => [x[0], x[1]]);
+  st.marks = (s.marks || []).map(x => [x[0], x[1]]);
+  st.voteOpen = !!s.voteOpen;
+  st.voteAt = s.voteAt || 0;
+  if(s.voteOpen) st.votes = Object.assign({}, s.votes || {});
+  else { delete st.votes; delete st.voteCounts; }
   if(s.timer && s.timer.running && typeof s.timer.endAt === 'number'){
     st.running = true;
     st.endAt = s.timer.endAt - (s._skew || 0);
@@ -289,10 +305,12 @@ function applyRemote(s){
   if(structural) renderPhase(phaseChanged);
   else tick();
   if(st.revealed.join(',') !== prev && prev) M.sound.play('flip');
+  paintFinale();
+  paintRecap();
 }
 function paintRoom(){
   const bar = $('#roomStatus'), exit = $('#roomExit'), row = $('#roomJoinRow');
-  if(!sync){ bar.textContent = ''; exit.hidden = true; row.hidden = false; $('#roomSeat').hidden = true; $('#roomBallot').innerHTML = ''; document.body.classList.remove('sync-guest'); return; }
+  if(!sync){ bar.textContent = ''; exit.hidden = true; row.hidden = false; $('#roomSeat').hidden = true; $('#roomBallot').innerHTML = ''; document.body.classList.remove('sync-guest'); paintFinale(); paintRecap(); return; }
   document.body.classList.add('sync-guest');
   row.hidden = true; exit.hidden = false;
   $('#roomSeat').hidden = false;
@@ -303,7 +321,7 @@ function paintRoom(){
       '<option value="">選んでください</option>' +
       D.characters.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('') +
       '</select></label>';
-    $('#seatPick').addEventListener('change', () => setSeat($('#seatPick').value));
+    $('#seatPick').addEventListener('change', () => { setSeat($('#seatPick').value); paintFinale(); });
   }
   if($('#seatPick').value !== seat) $('#seatPick').value = seat;
   const votes = (sync.state && sync.state.votes) || {};
@@ -320,6 +338,41 @@ function paintRoom(){
   $('#roomBallot').innerHTML = html;
   const truth = $('#roomTruth');
   if(truth) truth.addEventListener('click', () => { try { sessionStorage.setItem('madamis:voted:' + D.id, '1'); } catch(e){} });
+  paintFinale();
+  paintRecap();
+}
+function paintFinale(){
+  const box = $('#finaleBox');
+  const note = $('#finaleNote');
+  if(!box || !window.MadamisSync) return;
+  const active = !!(sync && sync.state && MadamisSync.isClosingPhase(D.phases, sync.state.phase));
+  MadamisSync.renderStatements(box, {
+    state: sync ? sync.state : {},
+    active: active,
+    scenario: D,
+    options: voteOptions,
+    draftKey: 'madamis:' + D.id + ':worddraft',
+    getSeat: mySeat,
+    onSubmit: (seat, pick, line) => { if(sync) sync.say(seat, pick, line); }
+  });
+  if(note) note.hidden = !!(sync && box._mode);
+}
+function paintRecap(){
+  const box = $('#recapBox');
+  if(!box || !window.MadamisSync) return;
+  const src = sync && sync.state && sync.state.voteOpen ? sync.state : (!sync && st.voteOpen ? st : null);
+  const home = (sync && $('#roomBar .room-bar')) || $('#vote .panel');
+  if(home && box.parentElement !== home) home.appendChild(box);
+  if(!src){ box.hidden = true; box.innerHTML = ''; box._html = ''; return; }
+  const html = MadamisSync.recapHTML(D, src);
+  if(!html){ box.hidden = true; box.innerHTML = ''; box._html = ''; return; }
+  const opened = box.querySelector('details') && box.querySelector('details').open;
+  if(box._html === html){ box.hidden = false; return; }
+  box.hidden = false;
+  box.innerHTML = html;
+  box._html = html;
+  const details = box.querySelector('details');
+  if(details && opened) details.open = true;
 }
 $('#roomBallot').addEventListener('click', e => {
   const b = e.target.closest('[data-choice]'); if(!b || !sync) return;
@@ -350,9 +403,10 @@ $('#roomJoin').addEventListener('click', () => joinRoom($('#roomInput').value));
 $('#roomInput').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); joinRoom($('#roomInput').value); } });
 $('#roomExit').addEventListener('click', () => {
   Sync.leave(D.id); if(sync) sync.close(); sync = null;
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', location.pathname + location.search);
   paintRoom(); renderPhase(false);
 });
 const bootCode = (Sync && (Sync.hashCode() || ((Sync.recall(D.id) || {}).code))) || '';
 if(bootCode && Sync.valid(bootCode) && !loaded) joinRoom(bootCode);
+else paintRecap();
 })();

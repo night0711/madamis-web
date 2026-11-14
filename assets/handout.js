@@ -33,7 +33,7 @@ const Sync = window.MadamisSync, D = window.SCENARIO;
 if(Sync && D && D.id === H.sid){
   const bar = document.createElement('section');
   bar.className = 'panel room-bar';
-  bar.innerHTML = `<div class="eyebrow">ROOM</div><p class="small">ホストの部屋に入ると、この端末にも進行・タイマー・公開カード・投票が届きます。このページの秘密は送りません。</p><div class="room-line" id="hoJoin"><input id="hoCode" inputmode="latin" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="部屋コード" aria-label="部屋コード"><button class="btn primary" type="button" id="hoGo">参加する</button></div><p class="small" id="hoStat" aria-live="polite"></p><div id="hoLive" hidden><p class="serif" id="hoPhase" style="font-size:1.35rem"></p><p class="room-time" id="hoTime">--:--</p><div id="hoCards"></div><div id="hoBallot" class="btn-row" style="margin-top:8px"></div><p class="small" id="hoVote"></p></div>`;
+  bar.innerHTML = `<div class="eyebrow">ROOM</div><p class="small">ホストの部屋に入ると、この端末にも進行・タイマー・公開カード・投票が届きます。このページの秘密は送りません。</p><div class="room-line" id="hoJoin"><input id="hoCode" inputmode="latin" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="部屋コード" aria-label="部屋コード"><button class="btn primary" type="button" id="hoGo">参加する</button></div><p class="small" id="hoStat" aria-live="polite"></p><div id="hoLive" hidden><p class="serif" id="hoPhase" style="font-size:1.35rem"></p><p class="room-time" id="hoTime">--:--</p><div id="hoCards"></div><div id="hoBallot" class="btn-row" style="margin-top:8px"></div><p class="small" id="hoVote"></p><div id="hoFinale"></div></div>`;
   $('#app').querySelector('main').insertBefore(bar, $('#app').querySelector('.summary'));
   const options = D.characters.map(c => ({ id: c.id, name: c.name })).concat((D.vote.extra || []).map(c => ({ id: c.id, name: c.name })));
   let sess = null;
@@ -60,6 +60,12 @@ if(Sync && D && D.id === H.sid){
       $('#hoBallot').innerHTML = options.map(o => `<button class="btn sm ${mine === o.id ? 'primary' : ''}" type="button" data-choice="${esc(o.id)}">${esc(o.name)}</button>`).join('');
       $('#hoVote').textContent = mine ? '送りました。開票まで、ほかの票は出ません。' : 'あなたの票を選べます。';
     }
+    Sync.renderStatements($('#hoFinale'), {
+      state: sess.state, active: Sync.isClosingPhase(D.phases, sess.state.phase), scenario: D,
+      options: options, draftKey: 'madamis:' + H.sid + ':worddraft',
+      getSeat: () => H.id,
+      onSubmit: (seat, pick, line) => sess.say(H.id, pick, line)
+    });
   }
   function join(code){
     if(!Sync.valid(Sync.normalize(code))){ M.alert('コードは8文字です'); return; }

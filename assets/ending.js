@@ -35,6 +35,52 @@ function reveal(){
   shown++;
   const nb = $('#nextStage'); nb.hidden = shown >= all.length;
   if(!nb.hidden) nb.textContent = '▼ ' + (stages()[shown].teaser || '続きを開く');
+  if(nb.hidden){ showRecap(); watchRoom(); }
+}
+let chaptersDone = false;
+function showRecap(){
+  chaptersDone = true;
+  const data = M.store.get('madamis:' + E.sid + ':recap', null);
+  const box0 = $('#tonight');
+  if(!data || !data.items || !data.items.length){ if(box0) box0.remove(); return; }
+  let box = box0;
+  if(!box){
+    box = document.createElement('details');
+    box.id = 'tonight';
+    box.className = 'recap panel';
+    const host = $('#nextStage') && $('#nextStage').parentElement;
+    (host || $('#stages')).insertAdjacentElement('afterend', box);
+  }
+  const was = box.open;
+  box.innerHTML = '<summary>今夜の振り返り</summary><ol class="timeline">' +
+    data.items.map(it => '<li><time>' + esc(it.min) + '</time><span>' + esc(it.text) + '</span></li>').join('') +
+    '</ol><p class="xs muted">この欄は、今夜の進行の記録だけです。</p>';
+  box.open = was;
+}
+let watching = false;
+function watchRoom(){
+  if(watching) return;
+  watching = true;
+  const saved = M.store.get('madamis:' + E.sid + ':room', null);
+  if(!saved || !saved.code) return;
+  function load(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = () => resolve(); s.onerror = () => reject(new Error(src));
+      document.body.appendChild(s);
+    });
+  }
+  load(new URL('scenario.js', location.href).href).then(() => load(new URL('../../assets/sync.js', location.href).href)).then(() => {
+    const Sync = window.MadamisSync, D = window.SCENARIO;
+    if(!Sync || !D || D.id !== E.sid || !Sync.valid(saved.code)) return;
+    Sync.connect({
+      sid: D.id, code: saved.code, host: false,
+      onChange: st => {
+        Sync.syncRecap(D, st);
+        if(chaptersDone) showRecap();
+      }
+    });
+  }).catch(() => {});
 }
 $('#nextStage').addEventListener('click', reveal);
 $('#pick').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if(!b) return; accused = b.dataset.a; $('#pick').hidden = true; build(); });
