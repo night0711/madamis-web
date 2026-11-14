@@ -36,6 +36,16 @@ $('#open').addEventListener('click', async () => {
   const sum = Object.values(votes).reduce((a, b) => a + b, 0);
   if(!sum){ M.alert('票数が入力されていません'); return; }
   if(sum !== D.characters.length && !window.__voteAuto && !confirm(`入力された票は${sum}票です（参加者は${D.characters.length}人）。このまま開票しますか？`)) return;
+  if(!window.__roomVote){
+    const playKey = 'madamis:' + D.id + ':state';
+    const cur = Object.assign({}, M.store.get(playKey, {}));
+    cur.voteOpen = true;
+    cur.voteAt = cur.voteAt || Date.now();
+    cur.voteCounts = {};
+    options.forEach(c => { cur.voteCounts[c.id] = votes[c.id] || 0; });
+    M.store.set(playKey, cur);
+    if(window.MadamisSync) MadamisSync.syncRecap(D, cur);
+  }
   $('#ctl').hidden = true; $('#how').hidden = true; $$('[data-ctl]').forEach(x => x.hidden = true);
   $$('.count').forEach(x => x.textContent = '0');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -69,9 +79,10 @@ $('#open').addEventListener('click', async () => {
 const Sync = window.MadamisSync;
 const boot = Sync && (Sync.hashCode() || ((Sync.recall(D.id) || {}).code));
 if(boot && Sync.valid(boot)){
+  window.__roomVote = true;
   const seatKey = 'madamis:' + D.id + ':seat';
   const seatNow = () => { try { return localStorage.getItem(seatKey) || ''; } catch(e){ return ''; } };
-  $('#how').insertAdjacentHTML('afterend', `<div class="panel" id="liveVote"><p class="small" id="liveStat"></p><label class="small">あなたの役 <select id="seatPick" aria-label="あなたの役"><option value="">選ぶ</option>${D.characters.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><div class="btn-row" id="liveBallot" style="margin-top:8px"></div></div>`);
+  $('#how').insertAdjacentHTML('afterend', `<div class="panel" id="liveVote"><p class="small" id="liveStat"></p><label class="small">あなたの役 <select id="seatPick" aria-label="あなたの役"><option value="">選ぶ</option>${D.characters.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><div class="btn-row" id="liveBallot" style="margin-top:8px"></div><div id="finaleBox"></div></div>`);
   $('#seatPick').value = seatNow();
   $('#seatPick').addEventListener('change', () => { try { localStorage.setItem(seatKey, $('#seatPick').value); } catch(e){} });
   $$('[data-ctl]').forEach(x => x.hidden = true);
@@ -82,6 +93,12 @@ if(boot && Sync.valid(boot)){
       const seat = seatNow();
       $('#liveStat').textContent = (sync.status === 'live' ? '部屋につながっています。' : '接続しています…') + '投票 ' + Object.keys(s.votes || {}).length + ' / ' + D.characters.length;
       $('#liveBallot').innerHTML = options.map(o => `<button class="btn sm ${s.votes && s.votes[seat] === o.id ? 'primary' : ''}" type="button" data-choice="${esc(o.id)}">${esc(o.name)}</button>`).join('');
+      Sync.renderStatements($('#finaleBox'), {
+        state: s, active: Sync.isClosingPhase(D.phases, s.phase) , scenario: D,
+        options: options, draftKey: 'madamis:' + D.id + ':worddraft',
+        getSeat: seatNow,
+        onSubmit: (seat, pick, line) => sync.say(seat, pick, line)
+      });
       if(s.voteOpen && !opened && Object.keys(s.votes || {}).length){
         opened = true;
         options.forEach(c => { votes[c.id] = 0; });

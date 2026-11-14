@@ -1,4 +1,4 @@
-/* 配布ページの進行操作。送るのはフェーズ番号・カードID・タイマー・投票IDだけ。 */
+/* 配布ページの進行操作。送るのはフェーズ番号・カードID・タイマー・投票IDと、最後のひとこと（60字）だけ。 */
 (function(){
 'use strict';
 const M = window.Madamis, D = window.SCENARIO, S = window.MadamisSync;
@@ -8,12 +8,13 @@ const esc = M.esc;
 const phases = D.phases, clues = D.clues;
 const options = D.characters.map(c => ({ id: c.id, name: c.name })).concat((D.vote.extra || []).map(c => ({ id: c.id, name: c.name })));
 let sess = null;
+let finaleWasOpen = null;
 
 root.innerHTML = `
 <div class="panel room-bar">
   <div class="eyebrow">ROOM</div>
   <h2 style="font-size:var(--t-xl)">各人のスマホで同じ進行</h2>
-  <p class="small">部屋を作ると、フェーズ・タイマー・めくったカード・投票が、参加した端末に届きます。ハンドアウトの中身は送りません。使わないときは、今まで通り画面共有でも遊べます。</p>
+  <p class="small">部屋を作ると、フェーズ・タイマー・めくったカード・投票が、参加した端末に届きます。最終議論では「最後のひとこと」も送れます。公開までは人数だけです。ハンドアウトの中身は送りません。使わないときは、今まで通り画面共有でも遊べます。</p>
   <div class="room-line">
     <button class="btn primary" type="button" id="roomCreate">部屋を作る</button>
     <button class="btn ghost" type="button" id="roomLeave" hidden>部屋を閉じる</button>
@@ -36,6 +37,14 @@ root.innerHTML = `
       <button class="btn ghost" type="button" id="hostPlus">＋1分</button>
     </div>
     <div id="hostCards" style="margin-top:12px"></div>
+    <div id="hostFinale" hidden>
+      <p class="small" id="hostWordCount" aria-live="polite"></p>
+      <div class="btn-row">
+        <button class="btn warm" type="button" id="hostReveal">一斉に公開</button>
+      </div>
+      <p class="small muted">出さなくても、このまま投票・開票できます。</p>
+      <div id="hostFinaleList"></div>
+    </div>
     <p class="small" id="hostVotes" style="margin-top:12px"></p>
     <div class="btn-row">
       <button class="btn warm" type="button" id="hostOpen">開票する</button>
@@ -84,6 +93,28 @@ function paint(){
     line += '　' + options.map(o => o.name + ' ' + counts[o.id]).join(' / ');
   } else line += '（開票するまで、票の中身は出しません）';
   $('hostVotes').textContent = line;
+  const closingAt = phases.findIndex((_, i) => S.isClosingPhase(phases, i));
+  const wordsNow = !!sess.state.wordsOpen;
+  const showFinale = wordsNow || (closingAt >= 0 && sess.state.phase >= closingAt);
+  $('hostFinale').hidden = !showFinale;
+  if(showFinale){
+    const submitted = S.submitted(sess.state).length;
+    $('hostWordCount').textContent = submitted + '人が提出済み';
+    $('hostReveal').hidden = wordsNow;
+    const list = $('hostFinaleList');
+    if(wordsNow){
+      const html = S.cardsInner(D, sess.state);
+      if(list.dataset.html !== html){
+        list.innerHTML = '<div class="finale-list" aria-live="polite">' + html + '</div>';
+        list.dataset.html = html;
+        if(finaleWasOpen === false) S.animateCards(list);
+      }
+    } else if(list.dataset.html){
+      list.innerHTML = '';
+      delete list.dataset.html;
+    }
+  }
+  finaleWasOpen = wordsNow;
 }
 
 function start(code, host){
@@ -129,6 +160,11 @@ $('hostCards').addEventListener('click', e => {
   const id = b.getAttribute('data-card');
   if(sess.state.revealed.indexOf(id) >= 0) return;
   mutate(s => { s.revealed = s.revealed.concat([id]); s.log = s.log.concat([[Date.now(), id]]); });
+});
+$('hostReveal').addEventListener('click', () => {
+  if(!sess) return;
+  if(!S.submitted(sess.state).length){ M.alert('まだ提出がありません。このまま投票できます'); return; }
+  if(sess.openWords()) M.sound.play('phase');
 });
 $('hostOpen').addEventListener('click', () => { if(sess) sess.openVotes(); });
 $('hostClear').addEventListener('click', () => { if(sess) sess.clearVotes(); });
