@@ -39,6 +39,7 @@ app.innerHTML = `
   <button class="btn sm ghost toggle" id="amb" type="button" hidden></button>
   <button class="btn sm ghost toggle" id="snd" type="button"></button>
 </div></header>
+<div id="plow" class="plow" hidden></div>
 <main>
 <section class="wrap" id="roomBar">
   <div class="panel room-bar">
@@ -170,7 +171,7 @@ if(ts){
     const tsSnd = $('#tsSnd'); M.soundToggle(tsSnd);
     let tw = null; setTimeout(() => { tw = M.typewrite($('.typer', ts), D.opening, 55); }, M.reduce ? 0 : 1600);
     const go = () => { if(tw) tw.skip(); sessionStorage.setItem('madamis:titleSeen:' + D.id, '1'); ts.classList.add('gone'); M.sound.play('phase'); setTimeout(() => ts.remove(), 1000);
-      const s = $('#snd'); const on = M.sound.on; s.setAttribute('aria-pressed', on); s.innerHTML = (on ? M.icon.sound : M.icon.mute) + '<span>' + (on ? '効果音 ON' : '効果音 OFF') + '</span>'; $('#amb').hidden = !on; };
+      const s = $('#snd'); const on = M.sound.on; s.setAttribute('aria-pressed', on); s.innerHTML = (on ? M.icon.sound : M.icon.mute) + '<span>' + (on ? '効果音 ON' : '効果音 OFF') + '</span>'; $('#amb').hidden = !on; paintPlow(); };
     $('#enter').addEventListener('click', go);
     $('#skip').addEventListener('click', () => { if(tw) tw.skip(); });
   }
@@ -181,6 +182,87 @@ const C = 2 * Math.PI * 54;
 let warned = false, ended = false, lastTick = -1;
 function total(){ return (D.phases[st.phase].min || 0) * 60; }
 function remain(){ if(!total()) return null; if(st.running && st.endAt) return (st.endAt - Date.now()) / 1000; return st.remain == null ? total() : st.remain; }
+
+/* 除雪車の接近。導入〜until の予定時間を物語の分数へ比例させる。部屋の状態は既存のフェーズとタイマーだけを見る。 */
+const PLOW_SVG = '<svg viewBox="0 0 68 32" aria-hidden="true"><path d="M50 9h5l9 14H52z" fill="#9aa6b8"/><path d="M50 23h18v3H48z" fill="#5d6878"/><rect x="6" y="14" width="44" height="11" rx="2" fill="#56b4e9"/><path d="M16 14V7h18l8 7H16z" fill="#0072b2"/><rect x="20" y="8" width="9" height="5" rx="1" fill="#d7eefb"/><rect x="34" y="3" width="5" height="4" rx="1" fill="#e69f00"/><circle cx="16" cy="27" r="4" fill="#5d6878"/><circle cx="42" cy="27" r="4" fill="#5d6878"/><circle cx="16" cy="27" r="1.4" fill="#d5dde6"/><circle cx="42" cy="27" r="1.4" fill="#d5dde6"/></svg>';
+const STORE_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="2" width="14" height="4" rx="1" fill="#e69f00"/><rect x="4" y="9" width="24" height="3" fill="#d5dde6"/><path d="M1 12h30l-3-4H4z" fill="#56b4e9"/><rect x="3" y="12" width="26" height="18" fill="#5d6878"/><rect x="7" y="16" width="8" height="6" fill="#e69f00"/><rect x="19" y="18" width="6" height="12" fill="#1a2433"/></svg>';
+function titleUp(){
+  const t = document.getElementById('title');
+  return !!(t && !t.classList.contains('gone'));
+}
+function mountPlow(){
+  const el = $('#plow');
+  if(!el || el.dataset.ready) return;
+  const cfg = D.plow;
+  if(!cfg || !(+cfg.storyMin > 0)){ el.remove(); return; }
+  el.dataset.ready = '1';
+  el.innerHTML = '<div class="plow-inner"><div class="plow-road" aria-hidden="true"><div class="plow-snow"></div><div class="plow-rig" id="plowRig">' + PLOW_SVG + '</div><div class="plow-store">' + STORE_SVG + '</div></div><p class="plow-label" id="plowText"></p></div>';
+  window.addEventListener('resize', () => { const n = $('#plow'); if(n && !n.hidden) parkPlow(n); });
+}
+function parkPlow(el){
+  const bar = document.querySelector('.topbar');
+  const topH = bar ? Math.ceil(bar.getBoundingClientRect().height) : 56;
+  el.style.top = topH + 'px';
+  const pad = topH + Math.ceil(el.getBoundingClientRect().height) + 8;
+  document.documentElement.style.scrollPaddingTop = pad + 'px';
+  document.documentElement.style.setProperty('--plow-scroll', pad + 'px');
+  document.body.classList.add('has-plow');
+}
+function plowView(){
+  const cfg = D.plow;
+  if(!cfg || !(+cfg.storyMin > 0) || !Array.isArray(D.phases) || !D.phases.length) return null;
+  const storyMin = +cfg.storyMin;
+  const untilId = cfg.until || 'vote';
+  let until = D.phases.findIndex(p => p.id === untilId);
+  if(until < 0) until = D.phases.length - 1;
+  const plannedSec = D.phases.slice(0, until + 1).reduce((sum, p) => sum + ((+p.min || 0) * 60), 0);
+  const voteOpen = (sync && sync.state) ? !!sync.state.voteOpen : !!st.voteOpen;
+  let mode = 'run';
+  if(voteOpen || st.phase > until) mode = 'done';
+  else if(st.phase === until) mode = 'soon';
+  let leftSec = 0;
+  if(st.phase <= until){
+    const r = remain();
+    leftSec += r == null ? ((+D.phases[st.phase].min || 0) * 60) : Math.max(0, r);
+    for(let j = st.phase + 1; j <= until; j++) leftSec += (+D.phases[j].min || 0) * 60;
+  }
+  let storyLeft = plannedSec > 0 ? (leftSec / plannedSec) * storyMin : 0;
+  if(storyLeft < 0) storyLeft = 0;
+  if(storyLeft > storyMin) storyLeft = storyMin;
+  const shown = Math.round(storyLeft);
+  const ratio = mode === 'done' || storyMin <= 0 ? 1 : Math.max(0, Math.min(1, 1 - storyLeft / storyMin));
+  const label = cfg.label || '除雪車到着まで';
+  const text = mode === 'done' ? (cfg.arrived || '除雪車が到着した')
+    : mode === 'soon' ? (cfg.soon || 'まもなく到着')
+    : (label + ' あと約' + shown + '分');
+  return { mode: mode, text: text, ratio: ratio, near: mode !== 'done' && shown <= 5, shown: shown };
+}
+function paintPlow(){
+  const el = $('#plow');
+  if(!el) return;
+  if(titleUp()){
+    el.hidden = true;
+    document.body.classList.remove('has-plow');
+    document.documentElement.style.scrollPaddingTop = '';
+    document.documentElement.style.removeProperty('--plow-scroll');
+    return;
+  }
+  const view = plowView();
+  if(!view){ el.hidden = true; return; }
+  el.hidden = false;
+  el.dataset.mode = view.mode;
+  el.classList.toggle('is-soon', view.mode === 'soon');
+  el.classList.toggle('is-done', view.mode === 'done');
+  el.classList.toggle('is-near', view.near);
+  const lab = $('#plowText');
+  if(lab && lab.textContent !== view.text) lab.textContent = view.text;
+  const rig = $('#plowRig');
+  if(rig){
+    const pct = Math.max(0, Math.min(1, view.ratio));
+    rig.style.left = 'calc(2px + ' + pct.toFixed(4) + ' * (100% - 76px))';
+  }
+  parkPlow(el);
+}
 function renderPhase(anim){
   const p = D.phases[st.phase], tot = total();
   $('#phNo').textContent = 'PHASE ' + String(st.phase + 1).padStart(2, '0') + ' / ' + D.phases.length;
@@ -192,6 +274,7 @@ function renderPhase(anim){
   warned = false; ended = false; tick(); renderCards();
 }
 function tick(){
+  paintPlow();
   const r = remain(), ring = $('#ring'), tot = total();
   if(r == null){ $('#time').textContent = '--:--'; $('#bar').style.strokeDashoffset = 0; ring.classList.remove('warn', 'done'); $('#phState').textContent = 'FREE'; $('#startBtn').hidden = true; $('#reset').hidden = $('#plus').hidden = true; return; }
   $('#startBtn').hidden = $('#reset').hidden = $('#plus').hidden = false;
@@ -270,6 +353,7 @@ window.addEventListener('storage', e => { if(sync) return; if(e.key === KEY){ Ob
 const secs = ['story', 'chars', 'timer', 'clues', 'vote'].map(id => document.getElementById(id));
 if('IntersectionObserver' in window){ const io = new IntersectionObserver(es => es.forEach(en => { if(en.isIntersecting) $$('.dock a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id)); }), { rootMargin: '-45% 0px -50% 0px' }); secs.forEach(s => s && io.observe(s)); }
 
+mountPlow();
 const loaded = readHash();
 if(!st.marks.length) markPhase(st.phase);
 save();

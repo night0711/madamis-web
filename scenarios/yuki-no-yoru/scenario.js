@@ -179,6 +179,11 @@ window.SCENARIO = {
    "ゲーム後に全員で答え合わせをして盛り上がる時間。いちばん楽しいところ。"
   ]
  ],
+ "plow": {
+  "label": "除雪車到着まで",
+  "storyMin": 60,
+  "until": "vote"
+ },
  "phases": [
   {
    "id": "op",
